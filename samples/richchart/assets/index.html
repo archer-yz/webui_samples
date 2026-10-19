@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebUI C++ Rich Chart (Chart.js, offline)</title>
+    <script src="webui.js"></script>
+    <!-- Served locally from the WebUI root folder: no internet needed -->
+    <script src="chart.umd.js"></script>
+    <style>
+        body { font-family: "Segoe UI", Arial, sans-serif; background: #282a36; color: #f8f8f2; margin: 0; padding: 20px; }
+        h2 { color: #50fa7b; margin: 0 0 12px; text-align: center; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .card { background: #1e1e2e; border-radius: 8px; padding: 12px; }
+        .row { text-align: center; margin-top: 12px; }
+        button { background: #bd93f9; border: none; padding: 8px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        button:hover { background: #ff79c6; }
+    </style>
+</head>
+<body>
+    <h2>C++ &rarr; Chart.js (served offline)</h2>
+    <div class="grid">
+        <div class="card"><canvas id="line"></canvas></div>
+        <div class="card"><canvas id="bar"></canvas></div>
+        <div class="card"><canvas id="pie"></canvas></div>
+        <div class="card"><canvas id="scatter"></canvas></div>
+    </div>
+    <div class="row"><button onclick="refresh()">Refresh data from C++</button></div>
+
+    <script>
+        Chart.defaults.color = '#f8f8f2';
+        Chart.defaults.borderColor = '#44475a';
+        const colors = ['#50fa7b', '#8be9fd', '#ff79c6', '#bd93f9', '#ffb86c', '#f1fa8c'];
+        const charts = {
+            line: new Chart('line', { type: 'line', data: { labels: [], datasets: [] },
+                options: { plugins: { title: { display: true, text: 'Line (time series)' } } } }),
+            bar: new Chart('bar', { type: 'bar', data: { labels: [], datasets: [] },
+                options: { plugins: { title: { display: true, text: 'Bar' } } } }),
+            pie: new Chart('pie', { type: 'doughnut', data: { labels: [], datasets: [] },
+                options: { plugins: { title: { display: true, text: 'Doughnut' } } } }),
+            scatter: new Chart('scatter', { type: 'scatter', data: { datasets: [] },
+                options: { plugins: { title: { display: true, text: 'Scatter' } } } }),
+        };
+
+        // Called from C++ with a JSON object: {line:{labels,series:{name:[..]}}, bar:{...}, pie:{...}, scatter:[{x,y}]}
+        function setData(d) {
+            const c = charts;
+            c.line.data.labels = d.line.labels;
+            c.line.data.datasets = Object.entries(d.line.series).map(([name, data], i) =>
+                ({ label: name, data, borderColor: colors[i], tension: 0.3, pointRadius: 0 }));
+            c.bar.data.labels = d.bar.labels;
+            c.bar.data.datasets = [{ label: 'Value', data: d.bar.values, backgroundColor: colors }];
+            c.pie.data.labels = d.pie.labels;
+            c.pie.data.datasets = [{ data: d.pie.values, backgroundColor: colors }];
+            c.scatter.data.datasets = [{ label: 'Samples', data: d.scatter, backgroundColor: colors[2] }];
+            Object.values(c).forEach(ch => ch.update());
+        }
+
+        function refresh() { webui.call('refresh'); }
+        window.addEventListener('load', () => setTimeout(refresh, 300));
+    </script>
+</body>
+</html>

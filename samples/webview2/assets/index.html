@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebUI C++ WebView2</title>
+    <script src="webui.js"></script>
+    <style>
+        body { font: 14px "Segoe UI", Arial, sans-serif; background: #1e1e2e; color: #f8f8f2; margin: 0; padding: 24px; }
+        h2 { color: #50fa7b; margin-top: 0; }
+        .card { background: #252536; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; max-width: 560px; }
+        button { background: #bd93f9; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-right: 6px; }
+        button:hover { background: #ff79c6; }
+        code { color: #8be9fd; }
+        #out { color: #f1fa8c; margin-top: 8px; min-height: 1.2em; }
+    </style>
+</head>
+<body>
+    <h2>Native window via WebView2</h2>
+    <div class="card">
+        This page runs in a standalone desktop window (no browser tab or address bar),
+        hosted by the Edge WebView2 runtime.
+        <div id="ua" style="margin-top:8px;color:#8a8aa3;font-size:12px"></div>
+    </div>
+    <div class="card">
+        <button onclick="ping()">Call C++</button>
+        <button onclick="webui.call('resize')">Resize window (C++)</button>
+        <button onclick="webui.call('quit')">Quit</button>
+        <div id="out"></div>
+    </div>
+    <script>
+        document.getElementById('ua').textContent = navigator.userAgent;
+        async function ping() {
+            document.getElementById('out').textContent = await webui.call('ping', 'hello from JS');
+        }
+    </script>
+</body>
+</html>

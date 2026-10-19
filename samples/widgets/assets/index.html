@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebUI C++ Widgets</title>
+    <script src="webui.js"></script>
+    <style>
+        :root { --bg:#1e1e2e; --panel:#252536; --bar:#181825; --fg:#e6e6f0; --muted:#8a8aa3; --accent:#7c9cff; --hover:#33334a; --border:#33334a; }
+        body.light { --bg:#ffffff; --panel:#f3f3f7; --bar:#e4e4ec; --fg:#1f1f2e; --muted:#6a6a80; --accent:#2f5bff; --hover:#dcdce8; --border:#cfcfdc; }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body { font: 13px "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--fg); display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+
+        /* menu bar */
+        #menubar { display: flex; background: var(--bar); border-bottom: 1px solid var(--border); }
+        .menu { position: relative; }
+        .menu > span { display: block; padding: 6px 12px; cursor: pointer; }
+        .menu > span:hover, .menu.open > span { background: var(--hover); }
+        .dropdown { display: none; position: absolute; top: 100%; left: 0; min-width: 190px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 6px 18px #0006; z-index: 20; padding: 4px 0; }
+        .menu.open .dropdown { display: block; }
+        .item { padding: 6px 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 24px; }
+        .item:hover { background: var(--accent); color: #fff; }
+        .item kbd { color: var(--muted); font: inherit; }
+        .sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+        /* toolbar */
+        #toolbar { display: flex; gap: 6px; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--border); align-items: center; }
+        button, input, select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; }
+        button { cursor: pointer; } button:hover { background: var(--hover); }
+        input[type=text] { flex: 1; user-select: text; }
+
+        /* layout */
+        #main { flex: 1; display: flex; min-height: 0; }
+        #sidebar { width: 280px; min-width: 120px; background: var(--panel); overflow: auto; padding: 6px 0; }
+        #splitter { width: 5px; cursor: col-resize; background: var(--border); }
+        #splitter:hover { background: var(--accent); }
+        #content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+        /* tree */
+        .node { padding: 2px 6px; cursor: pointer; white-space: nowrap; display: flex; gap: 4px; }
+        .node:hover { background: var(--hover); }
+        .node.sel { background: var(--accent); color: #fff; }
+        .children { margin-left: 14px; }
+
+        /* tabs */
+        #tabs { display: flex; background: var(--bar); border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab { padding: 6px 12px; cursor: pointer; border-right: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+        .tab.active { background: var(--bg); color: var(--fg); border-top: 2px solid var(--accent); }
+        .tab b { margin-left: 8px; font-weight: normal; } .tab b:hover { color: #f55; }
+        #panes { flex: 1; min-height: 0; display: flex; }
+        .pane { flex: 1; overflow: auto; padding: 14px; display: none; user-select: text; }
+        .pane.active { display: block; }
+        pre { margin: 0; font: 12px Consolas, monospace; white-space: pre-wrap; }
+        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; max-width: 520px; }
+        .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+        .row label { width: 110px; color: var(--muted); }
+
+        #status { display: flex; justify-content: space-between; padding: 3px 10px; background: var(--accent); color: #fff; font-size: 12px; }
+
+        /* context menu, modal, toast */
+        #ctx { position: fixed; display: none; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 6px 18px #0006; z-index: 30; min-width: 150px; padding: 4px 0; }
+        #modal { position: fixed; inset: 0; background: #0008; display: none; align-items: center; justify-content: center; z-index: 40; }
+        #modal .box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; min-width: 320px; }
+        #toast { position: fixed; right: 16px; bottom: 36px; background: var(--panel); border: 1px solid var(--accent); padding: 8px 14px; border-radius: 6px; opacity: 0; transition: opacity .3s; z-index: 50; }
+    </style>
+</head>
+<body>
+    <div id="menubar">
+        <div class="menu"><span>File</span><div class="dropdown">
+            <div class="item" onclick="openFolder()">Open Folder... <kbd>Ctrl+O</kbd></div>
+            <div class="item" onclick="goUp()">Go Up</div>
+            <div class="sep"></div>
+            <div class="item" onclick="webui.call('exit_app')">Exit</div></div></div>
+        <div class="menu"><span>View</span><div class="dropdown">
+            <div class="item" onclick="toggleSidebar()">Toggle Sidebar <kbd>Ctrl+B</kbd></div>
+            <div class="item" onclick="toggleTheme()">Toggle Light/Dark Theme</div></div></div>
+        <div class="menu"><span>Help</span><div class="dropdown">
+            <div class="item" onclick="showAbout()">About</div></div></div>
+    </div>
+
+    <div id="toolbar">
+        <button onclick="goUp()" title="Up">&#8679;</button>
+        <button onclick="loadRoot(currentRoot)" title="Refresh">&#8635;</button>
+        <input type="text" id="path" spellcheck="false">
+        <button onclick="loadRoot(document.getElementById('path').value)">Go</button>
+        <button onclick="toggleTheme()">&#9680; Theme</button>
+    </div>
+
+    <div id="main">
+        <div id="sidebar"></div>
+        <div id="splitter"></div>
+        <div id="content">
+            <div id="tabs"></div>
+            <div id="panes"></div>
+        </div>
+    </div>
+    <div id="status"><span id="st-left">Ready</span><span id="st-right"></span></div>
+
+    <div id="ctx"></div>
+    <div id="modal"><div class="box" id="modal-box"></div></div>
+    <div id="toast"></div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        let currentRoot = '';
+        let selected = null;
+
+        // ---- C++ bridge ----
+        async function listDir(p) { return JSON.parse(await webui.call('list_dir', p)); }
+        async function readFile(p) { return JSON.parse(await webui.call('read_file', p)); }
+
+        // ---- tree view (lazy loaded) ----
+        async function loadRoot(p) {
+            const r = await listDir(p);
+            if (r.error) return toast(r.error);
+            currentRoot = r.path; $('path').value = r.path;
+            $('sidebar').innerHTML = '';
+            renderEntries($('sidebar'), r);
+            status(r.entries.length + ' items in ' + r.path);
+        }
+        function renderEntries(parent, r) {
+            for (const e of r.entries) {
+                const full = r.path.replace(/[\\/]$/, '') + '/' + e.name;
+                const wrap = document.createElement('div');
+                const n = document.createElement('div');
+                n.className = 'node';
+                n.innerHTML = (e.dir ? '<span>&#9656;</span>&#128193;' : '<span style="width:.7em"></span>&#128196;') + ' ' + esc(e.name);
+                const kids = document.createElement('div'); kids.className = 'children'; kids.style.display = 'none';
+                n.onclick = async ev => {
+                    ev.stopPropagation(); select(n);
+                    if (e.dir) {
+                        const open = kids.style.display === 'none';
+                        if (open && !kids.hasChildNodes()) { const sub = await listDir(full); if (!sub.error) renderEntries(kids, sub); else toast(sub.error); }
+                        kids.style.display = open ? 'block' : 'none';
+                        n.firstChild.innerHTML = open ? '&#9662;' : '&#9656;';
+                    }
+                };
+                n.ondblclick = () => { if (!e.dir) openTab(full, e.name); };
+                n.oncontextmenu = ev => { ev.preventDefault(); select(n); ctxMenu(ev, full, e); };
+                wrap.append(n, kids); parent.append(wrap);
+            }
+        }
+        function select(n) { selected?.classList.remove('sel'); selected = n; n.classList.add('sel'); }
+
+        // ---- tabs ----
+        const tabs = {};
+        function addTab(id, title, html, closable = true) {
+            if (tabs[id]) return activate(id);
+            const t = document.createElement('div'); t.className = 'tab'; t.dataset.id = id;
+            t.innerHTML = esc(title) + (closable ? '<b>&#10005;</b>' : '');
+            t.onclick = () => activate(id);
+            if (closable) t.querySelector('b').onclick = ev => { ev.stopPropagation(); closeTab(id); };
+            const p = document.createElement('div'); p.className = 'pane'; p.innerHTML = html;
+            $('tabs').append(t); $('panes').append(p); tabs[id] = { t, p }; activate(id);
+        }
+        function activate(id) {
+            for (const [k, v] of Object.entries(tabs)) { v.t.classList.toggle('active', k === id); v.p.classList.toggle('active', k === id); }
+        }
+        function closeTab(id) {
+            tabs[id].t.remove(); tabs[id].p.remove(); delete tabs[id];
+            const rest = Object.keys(tabs); if (rest.length) activate(rest[rest.length - 1]);
+        }
+        async function openTab(full, name) {
+            const r = await readFile(full);
+            if (r.error) return toast(r.error);
+            addTab(full, name, '<pre>' + esc(r.text) + '</pre>');
+            status(name + ' - ' + r.size + ' bytes' + (r.truncated ? ' (truncated)' : ''));
+        }
+
+        // ---- menus ----
+        document.querySelectorAll('.menu > span').forEach(s => s.onclick = ev => {
+            const m = s.parentElement, was = m.classList.contains('open');
+            closeMenus(); if (!was) m.classList.add('open'); ev.stopPropagation();
+        });
+        function closeMenus() { document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open')); $('ctx').style.display = 'none'; }
+        document.addEventListener('click', closeMenus);
+        document.addEventListener('keydown', ev => {
+            if (ev.ctrlKey && ev.key === 'b') { ev.preventDefault(); toggleSidebar(); }
+            if (ev.ctrlKey && ev.key === 'o') { ev.preventDefault(); openFolder(); }
+            if (ev.key === 'Escape') { closeMenus(); $('modal').style.display = 'none'; }
+        });
+        function ctxMenu(ev, full, e) {
+            const c = $('ctx');
+            c.innerHTML = '';
+            const add = (label, fn) => { const d = document.createElement('div'); d.className = 'item'; d.textContent = label; d.onclick = fn; c.append(d); };
+            if (e.dir) add('Open as root', () => loadRoot(full)); else add('Open in tab', () => openTab(full, e.name));
+            add('Copy path', () => { navigator.clipboard?.writeText(full); toast('Path copied'); });
+            c.style.left = ev.clientX + 'px'; c.style.top = ev.clientY + 'px'; c.style.display = 'block';
+        }
+
+        // ---- actions ----
+        // Path is typed into the toolbar box (browsers have no native folder dialog here)
+        function openFolder() { $('path').focus(); $('path').select(); toast('Type a folder path and press Go'); }
+        function goUp() { const p = currentRoot.replace(/[\\/]+$/, ''); const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')); if (i > 0) loadRoot(p.slice(0, i + (p[i - 1] === ':' ? 1 : 0))); }
+        function toggleSidebar() { const s = $('sidebar'), sp = $('splitter'); const h = s.style.display === 'none'; s.style.display = sp.style.display = h ? '' : 'none'; }
+        function toggleTheme() { document.body.classList.toggle('light'); status('Theme: ' + (document.body.classList.contains('light') ? 'light' : 'dark')); }
+        function showAbout() {
+            $('modal-box').innerHTML = '<h3 style="margin-top:0">WebUI C++ Widgets</h3><p>Menus, tree, tabs, splitter, dialogs and forms built with plain HTML/CSS/JS and a C++ backend.</p><div style="text-align:right"><button onclick="$(\'modal\').style.display=\'none\'">Close</button></div>';
+            $('modal').style.display = 'flex';
+        }
+        function status(t) { $('st-left').textContent = t; }
+        let tt; function toast(t) { const e = $('toast'); e.textContent = t; e.style.opacity = 1; clearTimeout(tt); tt = setTimeout(() => e.style.opacity = 0, 2000); }
+        function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+        // ---- resizable splitter ----
+        $('splitter').onmousedown = ev => {
+            ev.preventDefault();
+            const move = e => $('sidebar').style.width = Math.max(120, e.clientX) + 'px';
+            const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+            document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+        };
+
+        // ---- welcome tab with form widgets ----
+        addTab('welcome', 'Welcome', `
+            <div class="card"><h3 style="margin-top:0">Form widgets</h3>
+                <div class="row"><label>Name</label><input type="text" id="f-name" value="Ada"></div>
+                <div class="row"><label>Role</label><select id="f-role"><option>Developer</option><option>Designer</option><option>Tester</option></select></div>
+                <div class="row"><label>Volume</label><input type="range" id="f-vol" min="0" max="100" value="40" oninput="$('f-volv').textContent=this.value"><span id="f-volv">40</span></div>
+                <div class="row"><label>Notifications</label><input type="checkbox" id="f-notify" checked></div>
+                <div class="row"><label></label><button onclick="submitForm()">Send to C++</button></div>
+                <div id="f-result" style="color:var(--accent)"></div>
+            </div>
+            <div class="card">Double-click a file in the tree to open it in a tab. Right-click for a context menu. Drag the splitter to resize. Try Ctrl+B and Ctrl+O.</div>`, false);
+
+        async function submitForm() {
+            const data = JSON.stringify({ name: $('f-name').value, role: $('f-role').value, volume: +$('f-vol').value, notify: $('f-notify').checked });
+            $('f-result').textContent = await webui.call('submit_form', data);
+        }
+
+        window.addEventListener('load', () => setTimeout(async () => loadRoot(await webui.call('get_home')), 300));
+    </script>
+</body>
+</html>

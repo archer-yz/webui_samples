@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebUI C++ Plotly (offline)</title>
+    <script src="webui.js"></script>
+    <!-- Served locally from the WebUI root folder: no internet needed -->
+    <script src="plotly.min.js"></script>
+    <style>
+        body { font-family: "Segoe UI", Arial, sans-serif; background: #282a36; color: #f8f8f2; margin: 0; padding: 16px; }
+        h2 { color: #50fa7b; margin: 0 0 12px; text-align: center; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .plot { background: #1e1e2e; border-radius: 8px; height: 380px; }
+        .row { text-align: center; margin-top: 12px; }
+        button { background: #bd93f9; border: none; padding: 8px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; margin: 0 4px; }
+        button:hover { background: #ff79c6; }
+        #status { margin-top: 8px; text-align: center; color: #8be9fd; min-height: 1.2em; }
+    </style>
+</head>
+<body>
+    <h2>C++ &rarr; Plotly (zoom, pan, hover, 3D rotate, export PNG)</h2>
+    <div class="grid">
+        <div id="line" class="plot"></div>
+        <div id="heat" class="plot"></div>
+        <div id="surf" class="plot"></div>
+        <div id="scatter" class="plot"></div>
+    </div>
+    <div class="row">
+        <button onclick="webui.call('refresh')">Refresh data from C++</button>
+        <button onclick="webui.call('start_live')">Start live</button>
+        <button onclick="webui.call('stop_live')">Stop live</button>
+    </div>
+    <div id="status">Drag to zoom, double-click to reset, click a scatter point to send it to C++.</div>
+
+    <script>
+        const layout = (title, extra = {}) => Object.assign({
+            title: { text: title }, paper_bgcolor: '#1e1e2e', plot_bgcolor: '#1e1e2e',
+            font: { color: '#f8f8f2' }, margin: { t: 40, l: 50, r: 20, b: 40 },
+        }, extra);
+        const cfg = { responsive: true, displaylogo: false };
+
+        // Called from C++ with JSON: {x, sin, cos, z, surf, sx, sy}
+        function setData(d) {
+            Plotly.react('line', [
+                { x: d.x, y: d.sin, name: 'sin', mode: 'lines', line: { color: '#50fa7b' } },
+                { x: d.x, y: d.cos, name: 'cos', mode: 'lines', line: { color: '#8be9fd' } },
+            ], layout('Line (zoom / pan / legend toggle)'), cfg);
+            Plotly.react('heat', [{ z: d.z, type: 'heatmap', colorscale: 'Viridis' }], layout('Heatmap'), cfg);
+            Plotly.react('surf', [{ z: d.surf, type: 'surface', colorscale: 'Portland' }],
+                layout('3D surface (drag to rotate)', { margin: { t: 40, l: 0, r: 0, b: 0 } }), cfg);
+            Plotly.react('scatter', [{ x: d.sx, y: d.sy, mode: 'markers', type: 'scatter',
+                marker: { color: '#ff79c6', size: 8 } }], layout('Scatter (click a point)'), cfg)
+                .then(gd => {
+                    gd.removeAllListeners && gd.removeAllListeners('plotly_click');
+                    gd.on('plotly_click', ev => {
+                        const p = ev.points[0];
+                        webui.call('point_clicked', p.x.toFixed(3) + ',' + p.y.toFixed(3));
+                    });
+                });
+        }
+
+        // Called from C++ to append points to the line chart (live streaming)
+        function appendLive(x, s, c) {
+            Plotly.extendTraces('line', { x: [[x], [x]], y: [[s], [c]] }, [0, 1], 200);
+        }
+
+        function setStatus(t) { document.getElementById('status').textContent = t; }
+        window.addEventListener('load', () => setTimeout(() => webui.call('refresh'), 300));
+    </script>
+</body>
+</html>

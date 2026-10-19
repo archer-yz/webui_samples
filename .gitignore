@@ -1,0 +1,25 @@
+# CMake build and install output
+/build/
+/build-*/
+/build-msvc/
+/dist/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+CMakeUserPresets.json
+
+# Compiled artifacts
+*.exe
+*.obj
+*.o
+*.lib
+*.exp
+*.ilk
+*.pdb
+
+# IDE files
+.vs/
+*.suo
+*.user
+*.VC.db

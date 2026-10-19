@@ -1,0 +1,27 @@
+{
+    "version": 2,
+    "configurePresets": [
+        {
+            "name": "vcpkg_release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-msvc/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_OVERLAY_PORTS": "${sourceDir}/ports",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+                "VCPKG_INSTALL_OPTIONS": "--clean-after-build",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/dist/${presetName}",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded"
+            }
+        },
+        {
+            "name": "vcpkg_debug",
+            "inherits": "vcpkg_release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebug"
+            }
+        }
+    ]
+}
